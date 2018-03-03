@@ -87,7 +87,10 @@ class PTFAstroSL:
     def get_ft(self, n=0, s=500, lock=False):
         time, flux = self.get_lc(n=n)
         avg_sample_rate = (max(time)-min(time))/len(time)
-        ny = 1/(2*avg_sample_rate)
+        if avg_sample_rate != 0:
+            ny = 1/(2*avg_sample_rate)
+        else:
+            ny = 1/24
         res = 1/(max(time)-min(time))
         if lock:
             us = s
