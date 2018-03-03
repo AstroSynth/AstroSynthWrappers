@@ -8,3 +8,13 @@ This repository, while publically avalible is not nessisarily intended for use b
 1) MongoDB installed
 2) UNIX system
 3) MongoDB should have PTF data stored in a collection
+
+## Installation
+If you really want to install this there are two ways. If you are new to python (which seams unlikely if you are trying to install this wierd module that you probably dug up after hours of searching for one very particular thing) then I recommend pip
+```bash
+pip install astroSynthWrappers
+```
+I will try to keep the pip listing up to date. However, If you want to be sure you have the most up to data version clone this repository and then run
+```bash
+python setup.py install
+```
