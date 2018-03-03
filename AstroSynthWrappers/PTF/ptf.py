@@ -10,8 +10,6 @@ from itertools import tee
 
 from pymongo import MongoClient
 
-import matplotlib.pyplot as plt
-
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
         with open('MongoDB.log', 'w') as f:
