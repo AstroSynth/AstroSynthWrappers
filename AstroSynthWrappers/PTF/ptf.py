@@ -86,22 +86,26 @@ class PTFAstroSL:
     
     def get_ft(self, n=0, s=500, lock=False):
         time, flux = self.get_lc(n=n)
-        avg_sample_rate = (max(time)-min(time))/len(time)
-        if avg_sample_rate != 0:
-            ny = 1/(2*avg_sample_rate)
-            res = 1/(max(time)-min(time))
-        else:
-            ny = 1/24
-            res = 0.01
-        if lock:
-            us = s
-        else:
-            us = int(10*ny/(res))
-        f = np.linspace((0.1*res), ny, us)
+        if not len(time) <= 2:
+            avg_sample_rate = (max(time)-min(time))/len(time)
+            if avg_sample_rate != 0:
+                ny = 1/(2*avg_sample_rate)
+                res = 1/(max(time)-min(time))
+            else:
+                ny = 1/24
+                res = 0.01
+            if lock:
+                us = s
+            else:
+                us = int(10*ny/(res))
+            f = np.linspace((0.1*res), ny, us)
         
-        flux = self.normalize(flux)
-        pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
-        return f, pgram
+            flux = self.normalize(flux)
+            pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
+            return f, pgram
+        else:
+            f = np.linspace(0, 1/24, 100)
+            return f, np.zeros(100)
 
     def xget_orderd_lc(self, stop=None):
         if self.ordered_cursor is None:
