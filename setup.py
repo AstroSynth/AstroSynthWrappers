@@ -4,7 +4,7 @@ from os import path
 HERE = path.abspath(path.dirname(__file__))
 
 setup(name='AstroSynthWrappers',
-      version='0.1',
+      version='0.1.4',
       description='Data Wrappers meant to mimic the astroSynth data interface',
       url='https://github.com/tboudreaux/AstroSynthWrappers.git',
       author='Thomas Boudreaux',
@@ -24,5 +24,5 @@ setup(name='AstroSynthWrappers',
           'astropy>=2.0.2',
           'pymongo>=3.5.1'
       ],
-      packages=['AstroSynthWrappers'],
+      packages=['AstroSynthWrappers', 'astroSynthWrappers.PTF'],
       zip_safe=False)

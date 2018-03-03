@@ -1,1 +1,1 @@
-from .PTF import PTFAstroSL
+from .PTF import ptf
