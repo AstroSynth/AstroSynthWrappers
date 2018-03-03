@@ -89,9 +89,10 @@ class PTFAstroSL:
         avg_sample_rate = (max(time)-min(time))/len(time)
         if avg_sample_rate != 0:
             ny = 1/(2*avg_sample_rate)
+            res = 1/(max(time)-min(time))
         else:
             ny = 1/24
-        res = 1/(max(time)-min(time))
+            res = 0.01
         if lock:
             us = s
         else:
