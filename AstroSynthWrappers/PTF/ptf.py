@@ -112,7 +112,7 @@ class PTFAstroSL:
             self.ordered_cursor = self.__get_ordered_cursor__()
         if stop is None:
             stop = self.size
-        self.ordered_cursor, cur = tee(PTFTest.ordered_cursor)
+        self.ordered_cursor, cur = tee(self.ordered_cursor)
         for i, target in enumerate(cur):
             if i >= stop:
                 break
@@ -121,7 +121,7 @@ class PTFAstroSL:
     def xget_orderd_ft(self, stop=None, s=500, lock=False):
         if self.ordered_cursor is None:
             self.ordered_cursor = self.__get_ordered_cursor__()
-        self.ordered_cursor, cur = tee(PTFTest.ordered_cursor)
+        self.ordered_cursor, cur = tee(self.ordered_cursor)
         if stop is None:
             stop = self.size
         for i, target in enumerate(cur):
