@@ -11,8 +11,6 @@ from itertools import tee
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
-import time
-
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
         with open('MongoDB.log', 'w') as f:
@@ -97,9 +95,9 @@ class PTFAstroSL:
     def normalize(self, arr):
         return [(y/np.mean(arr))-1 for y in arr]
     
-    def get_ft(self, n=0, s=500, lock=False, nymult=1):
+    def get_ft(self, n=0, s=500, lock=False, nymult=1, num=1):
         if not self.dbft:
-            return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult)
+            return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult, num=num)
         else:
             return self.__query_ft__(n=n)
 
@@ -107,9 +105,10 @@ class PTFAstroSL:
         data = self.collection.find_one({"numerical_index": n})
         return data['Frequency'], data['Amplitude'], (data['_id'], data['numerical_index'])
 
-    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1):
+    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1, num=1):
         time, flux, meta = self.get_lc(n=n)
-        if not len(time) <= 2:
+
+        if not len(time) <= 1:
             avg_sample_rate = (max(time)-min(time))/len(time)
             if avg_sample_rate != 0:
                 ny = 1/(2*avg_sample_rate)
@@ -121,14 +120,28 @@ class PTFAstroSL:
                 us = s
             else:
                 us = int(10*ny/(res))
-            f = np.linspace((0.1*res), nymult*ny, us)
-        
             flux = self.normalize(flux)
-            pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
-            return f, pgram, meta
+            start_freq = 0.1*res
+            end_freq = nymult*ny
+            total_range = end_freq-start_freq
+            fts = np.zeros((num, 2, us))
+
+            for i in range(num):
+                sub_start = ((i/num)*total_range) + start_freq
+                sub_end = (((i+1)/num)*total_range) + start_freq
+                f = np.linspace(sub_start, sub_end, us)
+                pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
+                fts[i][0] = f
+                fts[i][1] = pgram
+            return fts[:, 0, :], fts[:, 1, :], meta
+
         else:
-            f = np.linspace(0, 1/24, 100)
-            return f, np.zeros(100), meta
+            f = np.linspace(0, 1/24, s)
+            fts = np.zeros((num, 2, s))
+            for i in range(num):
+                fts[i][0] = f
+                fts[i][1] = np.zeros(s)
+            return fts[:, 0, :], fts[:, 1, :], meta
 
     def xget_orderd_lc(self, stop=None):
         if self.ordered_cursor is None:
@@ -141,7 +154,7 @@ class PTFAstroSL:
                 break
             yield self.get_lc(n=target['numerical_index'])
 
-    def xget_orderd_ft(self, stop=None, s=500, lock=False, nymult=1):
+    def xget_orderd_ft(self, stop=None, s=500, lock=False, nymult=1, num=1):
         if self.ordered_cursor is None:
             self.ordered_cursor = self.__get_ordered_cursor__()
         self.ordered_cursor, cur = tee(self.ordered_cursor)
@@ -150,7 +163,7 @@ class PTFAstroSL:
         for i, target in enumerate(cur):
             if i >= stop:
                 break
-            yield self.get_ft(n=target['numerical_index'], s=s, lock=lock)
+            yield self.get_ft(n=target['numerical_index'], s=s, lock=lock, num=num)
 
     def xget_lc(self, stop=None, start=0):
         if stop is None:
@@ -158,11 +171,11 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_lc(n=i)
 
-    def xget_ft(self, stop=None, start=0, s=500, lock=False, nymult=1):
+    def xget_ft(self, stop=None, start=0, s=500, lock=False, nymult=1, num=1):
         if stop is None:
             stop = self.size
         for i in range(start, stop):
-            yield self.get_ft(n=i, s=s, lock=lock)
+            yield self.get_ft(n=i, s=s, lock=lock, num=num)
 
     def get_lc(self, n=0, se=0, full=True):
         data = self.__get_target_buffer__(n)
@@ -180,8 +193,8 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_object(n=i)
 
-    def cache_ft(self, s=500, lock=False, nymult=1):
-        for freq, amp, meta in self.xget_ft(s=s, lock=lock, nymult=nymult):
+    def cache_ft(self, s=500, lock=False, nymult=1, num=1):
+        for freq, amp, meta in self.xget_ft(s=s, lock=lock, nymult=nymult, num=num):
             ID = meta[0]
             post = {"Frequency":freq.tolist(), "Amplitude":amp.tolist()}
             self.collection.update({"_id":ID}, {"$set":post}, upsert=False)
@@ -212,20 +225,6 @@ class PTFAstroSL:
 
 if __name__ == '__main__':
     PTFTest = PTFAstroSL('PTFData')
-    deltas = list()
-    for i in range(1000):
-        start = time.time()
-        PTFTest.get_ft(n=i)
-        deltas.append(time.time()-start)
-    print('Generating : ', np.mean(deltas))
-
-    deltas = list()
-    for i in range(1000):
-        start = time.time()
-        PTFTest.get_ft(n=i)
-        PTFTest.use_db_ft(True)
-        deltas.append(time.time()-start)
-    print('Querying : ', np.mean(deltas))
 
 
 
