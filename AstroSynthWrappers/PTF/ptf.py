@@ -11,6 +11,8 @@ from itertools import tee
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
+import time
+
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
         with open('MongoDB.log', 'w') as f:
@@ -26,18 +28,25 @@ class PTFAstroSL:
         self.__buffer__ = dict()
         self.__si__ = 0
         self.__fill_data_buffer__(0)
+        self.dbft = False
+
+    def use_db_ft(self, use):
+        if 'Frequency' in self.collection.find_one() and use:
+            self.dbft = True
+        elif 'Frequency' not in self.collection.find_one():
+            raise EnvironmentError('FT not cached on database')
 
     def __get_ordered_cursor__(self):
         return self.collection.aggregate([{"$sort" : {"size": -1}}], allowDiskUse=True)
 
     def __fill_data_buffer__(self, n):
         self.__si__ = n
-        for i, lightcurve in enumerate(self.collection.find({"numerical_index": {"$lt":self.__si__+self.nk, "$gte":self.__si__}})):
+        for i, lightcurve in enumerate(self.collection.find({"numerical_index": {"$lt":self.__si__+self.nk, "$gte":self.__si__}}, {"Frequency": 0, "Amplitude": 0})):
             self.__buffer__[i] = pd.DataFrame(data=lightcurve)
 
     def __fill_data_buffer_around__(self, n):
         self.__si__ = int(np.floor(n-0.5*self.nk))
-        for i, lightcurve in enumerate(self.collection.find({"numerical_index": {"$lt":self.__si__+self.nk, "$gte":self.__si__}})):
+        for i, lightcurve in enumerate(self.collection.find({"numerical_index": {"$lt":self.__si__+self.nk, "$gte":self.__si__}}, {"Frequency": 0, "Amplitude": 0})):
             self.__buffer__[i] = pd.DataFrame(data=lightcurve)
 
     def __lc_present__(self, n):
@@ -89,6 +98,16 @@ class PTFAstroSL:
         return [(y/np.mean(arr))-1 for y in arr]
     
     def get_ft(self, n=0, s=500, lock=False, nymult=1):
+        if not self.dbft:
+            return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult)
+        else:
+            return self.__query_ft__(n=n)
+
+    def __query_ft__(self, n=0):
+        data = self.collection.find_one({"numerical_index": n})
+        return data['Frequency'], data['Amplitude'], (data['_id'], data['numerical_index'])
+
+    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1):
         time, flux, meta = self.get_lc(n=n)
         if not len(time) <= 2:
             avg_sample_rate = (max(time)-min(time))/len(time)
@@ -161,6 +180,13 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_object(n=i)
 
+    def cache_ft(self, s=500, lock=False, nymult=1):
+        for freq, amp, meta in self.xget_ft(s=s, lock=lock, nymult=nymult):
+            ID = meta[0]
+            post = {"Frequency":freq.tolist(), "Amplitude":amp.tolist()}
+            self.collection.update({"_id":ID}, {"$set":post}, upsert=False)
+
+
     def __len__(self):
         return self.size
 
@@ -186,6 +212,20 @@ class PTFAstroSL:
 
 if __name__ == '__main__':
     PTFTest = PTFAstroSL('PTFData')
+    deltas = list()
+    for i in range(1000):
+        start = time.time()
+        PTFTest.get_ft(n=i)
+        deltas.append(time.time()-start)
+    print('Generating : ', np.mean(deltas))
+
+    deltas = list()
+    for i in range(1000):
+        start = time.time()
+        PTFTest.get_ft(n=i)
+        PTFTest.use_db_ft(True)
+        deltas.append(time.time()-start)
+    print('Querying : ', np.mean(deltas))
 
 
 
