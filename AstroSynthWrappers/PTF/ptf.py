@@ -9,6 +9,7 @@ import subprocess
 from itertools import tee
 
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
@@ -56,7 +57,10 @@ class PTFAstroSL:
             return self.__buffer__[n-self.__si__]
 
     def get_data_from_db(self, n):
-        data = self.collection.find_one({"numerical_index": n})
+        if isinstance(n, int):
+            data = self.collection.find_one({"numerical_index": n})
+        elif isinstance(n, ObjectId):
+            data = self.collection.find_one({"_id":n})
         return pd.DataFrame(data=data)
 
     def __open_db_connection__(self):
@@ -85,7 +89,7 @@ class PTFAstroSL:
         return [(y/np.mean(arr))-1 for y in arr]
     
     def get_ft(self, n=0, s=500, lock=False):
-        time, flux = self.get_lc(n=n)
+        time, flux, meta = self.get_lc(n=n)
         if not len(time) <= 2:
             avg_sample_rate = (max(time)-min(time))/len(time)
             if avg_sample_rate != 0:
@@ -102,10 +106,10 @@ class PTFAstroSL:
         
             flux = self.normalize(flux)
             pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
-            return f, pgram
+            return f, pgram, meta
         else:
             f = np.linspace(0, 1/24, 100)
-            return f, np.zeros(100)
+            return f, np.zeros(100), meta
 
     def xget_orderd_lc(self, stop=None):
         if self.ordered_cursor is None:
@@ -146,7 +150,7 @@ class PTFAstroSL:
         if not full:
             data = self.__split__(data)
             data = data[se]
-        return data.obsHJD.tolist(), data.mag.tolist()
+        return data.obsHJD.tolist(), data.mag.tolist(), (data._id[0], data.numerical_index[0])
 
     def get_object(self, n=0):
         return self.__get_target_buffer__(n)
@@ -182,9 +186,6 @@ class PTFAstroSL:
 
 if __name__ == '__main__':
     PTFTest = PTFAstroSL('PTFData')
-    for f, a in PTFTest.xget_orderd_ft(stop=5):
-        plt.plot(f, a)
-        plt.show()
 
 
 
