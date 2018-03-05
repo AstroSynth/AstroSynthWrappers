@@ -88,7 +88,7 @@ class PTFAstroSL:
     def normalize(self, arr):
         return [(y/np.mean(arr))-1 for y in arr]
     
-    def get_ft(self, n=0, s=500, lock=False):
+    def get_ft(self, n=0, s=500, lock=False, nymult=1):
         time, flux, meta = self.get_lc(n=n)
         if not len(time) <= 2:
             avg_sample_rate = (max(time)-min(time))/len(time)
@@ -102,7 +102,7 @@ class PTFAstroSL:
                 us = s
             else:
                 us = int(10*ny/(res))
-            f = np.linspace((0.1*res), ny, us)
+            f = np.linspace((0.1*res), nymult*ny, us)
         
             flux = self.normalize(flux)
             pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
