@@ -122,7 +122,7 @@ class PTFAstroSL:
                 break
             yield self.get_lc(n=target['numerical_index'])
 
-    def xget_orderd_ft(self, stop=None, s=500, lock=False):
+    def xget_orderd_ft(self, stop=None, s=500, lock=False, nymult=1):
         if self.ordered_cursor is None:
             self.ordered_cursor = self.__get_ordered_cursor__()
         self.ordered_cursor, cur = tee(self.ordered_cursor)
@@ -139,7 +139,7 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_lc(n=i)
 
-    def xget_ft(self, stop=None, start=0, s=500, lock=False):
+    def xget_ft(self, stop=None, start=0, s=500, lock=False, nymult=1):
         if stop is None:
             stop = self.size
         for i in range(start, stop):
