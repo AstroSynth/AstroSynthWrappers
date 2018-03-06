@@ -100,9 +100,9 @@ class PTFAstroSL:
     def normalize(self, arr):
         return [(y/np.mean(arr))-1 for y in arr]
     
-    def get_ft(self, n=0, s=500, lock=False, nymult=1, num=1):
+    def get_ft(self, n=0, s=500, lock=False, nymult=1, num=1, frange=None):
         if not self.dbft:
-            return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult, num=num)
+            return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult, num=num, frange=frange)
         else:
             return self.__query_ft__(n=n)
 
@@ -115,7 +115,7 @@ class PTFAstroSL:
         data = self.collection.find_one({"numerical_index": n})
         return data['Frequency'], data['Amplitude'], (data['_id'], data['numerical_index'])
 
-    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1, num=1, full=True, se=0):
+    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1, num=1, full=True, se=0, frange=[None]):
         time, flux, meta = self.get_lc(n=n, full=full, se=se)
 
         if not len(time) <= 1:
@@ -134,15 +134,24 @@ class PTFAstroSL:
             start_freq = 0.1*res
             end_freq = nymult*ny
             total_range = end_freq-start_freq
-            fts = np.zeros((num, 2, us))
+            
 
-            for i in range(num):
-                sub_start = ((i/num)*total_range) + start_freq
-                sub_end = (((i+1)/num)*total_range) + start_freq
-                f = np.linspace(sub_start, sub_end, us)
+            if frange[0] == None:
+                fts = np.zeros((num, 2, us))
+                for i in range(num):
+                    sub_start = ((i/num)*total_range) + start_freq
+                    sub_end = (((i+1)/num)*total_range) + start_freq
+                    f = np.linspace(sub_start, sub_end, us)
+                    pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
+                    fts[i][0] = f
+                    fts[i][1] = pgram
+            else:
+                fts = np.zeros((1, 2, us))
+                f = np.linspace(frange[0], frange[1], us)
                 pgram = lombscargle(np.array(time), np.array(flux), f, normalize=True)
-                fts[i][0] = f
-                fts[i][1] = pgram
+                fts[0][0] = f
+                fts[0][1] = pgram
+
             return fts[:, 0, :], fts[:, 1, :], meta
 
         else:
@@ -277,9 +286,7 @@ if __name__ == '__main__':
     PTFTest = PTFAstroSL('PTFData')
     PTFTest.split_length=365
 
-
-    for spect in PTFTest.xget_orderd_spect(dim=500, stop=2):
-        plt.imshow(spect[0])
-        plt.show()
-
+    ft = PTFTest.get_ft(n=0, lock=True, frange=[144, 2880])
+    plt.plot(ft[0][0], ft[1][0])
+    plt.show()
 
