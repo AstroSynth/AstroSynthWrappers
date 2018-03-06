@@ -4,7 +4,7 @@ from os import path
 HERE = path.abspath(path.dirname(__file__))
 
 setup(name='AstroSynthWrappers',
-      version='0.1.13',
+      version='0.1.14',
       description='Data Wrappers meant to mimic the astroSynth data interface',
       url='https://github.com/tboudreaux/AstroSynthWrappers.git',
       author='Thomas Boudreaux',

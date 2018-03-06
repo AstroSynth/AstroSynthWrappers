@@ -3,6 +3,7 @@ import numpy as np
 
 from scipy.signal import lombscargle
 from scipy.optimize import curve_fit
+from scipy import misc
 
 import os
 import subprocess
@@ -10,6 +11,8 @@ from itertools import tee
 
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+
+import matplotlib.pyplot as plt
 
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
@@ -27,6 +30,7 @@ class PTFAstroSL:
         self.__si__ = 0
         self.__fill_data_buffer__(0)
         self.dbft = False
+        self.split_length = 365 # days
 
     def use_db_ft(self, use):
         if 'Frequency' in self.collection.find_one() and use:
@@ -76,20 +80,21 @@ class PTFAstroSL:
         collection = db[self.collectionname]
         return client, db, collection
 
-    def __split__(self, frame, split_length=365, keyCol='obsHJD'):
+    def __split__(self, frame, keyCol='obsHJD'):
         last_date = frame[keyCol].iloc[0]
         last_index = 0
         split_crit = list()
         for i, date in enumerate(frame[keyCol][1:]):
-            print(date, split_length+last_date, date > split_length+last_date)
-            if date > split_length+last_date:
-                print('Gab found at {}'.format(i))
+            if date > self.split_length+last_date:
                 stop = i+1
                 split_crit.append([last_index, stop])
                 last_index = stop
                 last_date = date
         parts = [frame.iloc[x[0]:x[1]] for x in split_crit]
-        parts.append(frame.iloc[split_crit[-1][1]:])
+        if len(split_crit) != 0:
+            parts.append(frame.iloc[split_crit[-1][1]:])
+        else:
+            parts.append(frame[:])
         return parts
     
     def normalize(self, arr):
@@ -101,12 +106,17 @@ class PTFAstroSL:
         else:
             return self.__query_ft__(n=n)
 
+    def xget_sub_ft(self, n=0, s=500, lock=False, nymult=1):
+        num = self.get_psedo_visit_num(n=n)
+        for i in range(num):
+            yield self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult, full=False, se=i)
+
     def __query_ft__(self, n=0):
         data = self.collection.find_one({"numerical_index": n})
         return data['Frequency'], data['Amplitude'], (data['_id'], data['numerical_index'])
 
-    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1, num=1):
-        time, flux, meta = self.get_lc(n=n)
+    def __generate_ft__(self, n=0, s=500, lock=False, nymult=1, num=1, full=True, se=0):
+        time, flux, meta = self.get_lc(n=n, full=full, se=se)
 
         if not len(time) <= 1:
             avg_sample_rate = (max(time)-min(time))/len(time)
@@ -177,12 +187,16 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_ft(n=i, s=s, lock=lock, num=num)
 
+    def get_psedo_visit_num(self, n=0):
+        data = self.__get_target_buffer__(n)
+        return len(self.__split__(data))
+
     def get_lc(self, n=0, se=0, full=True):
         data = self.__get_target_buffer__(n)
         if not full:
             data = self.__split__(data)
             data = data[se]
-        return data.obsHJD.tolist(), data.mag.tolist(), (data._id[0], data.numerical_index[0])
+        return data.obsHJD.tolist(), data.mag.tolist(), (data._id.tolist()[0], data.numerical_index.tolist()[0])
 
     def get_object(self, n=0):
         return self.__get_target_buffer__(n)
@@ -198,6 +212,42 @@ class PTFAstroSL:
             ID = meta[0]
             post = {"Frequency":freq.tolist(), "Amplitude":amp.tolist()}
             self.collection.update({"_id":ID}, {"$set":post}, upsert=False)
+
+    def __get_spect__(self, n=0, s=500, dim=50,
+                      Normalize=False, nymult=1):
+        Amps = list()
+        LD_stretch = 1
+        UD_stretch = float(self.get_psedo_visit_num(n=n)/dim)
+        if UD_stretch < 1:
+            UD_stretch = 1/UD_stretch
+        for Freq, Amp, meta in self.xget_sub_ft(n=n, s=500, lock=True, nymult=100):
+            Amps.append(Amp[0])
+        print(len(Amps))
+        out_tuple = (np.repeat(np.repeat(Amps, LD_stretch, axis=1), UD_stretch, axis=0),
+                     Freq, meta)
+        orig_max = out_tuple[0].max()
+        orig_min = out_tuple[0].min()
+        orig_range = orig_max - orig_min
+
+        out_img = misc.imresize(out_tuple[0], (dim, s), interp='cubic')
+        out_img = ((out_img * orig_range)/255.0)+orig_min
+        if Normalize is True:
+            out_img = out_img/(np.mean(out_img) - 1)
+        out_tuple = (out_img, out_tuple[1], out_tuple[2])
+        return out_tuple
+
+    def xget_orderd_spect(self, s=500, dim=50,
+                             Normalize=False, stop=None):
+        if self.ordered_cursor is None:
+            self.ordered_cursor = self.__get_ordered_cursor__()
+        self.ordered_cursor, cur = tee(self.ordered_cursor)
+        if stop is None:
+            stop = self.size
+        for i, target in enumerate(cur):
+            if i >= stop:
+                break
+            n = target["numerical_index"]
+            yield self.__get_spect__(n=n, s=s, dim=dim, Normalize=Normalize)
 
 
     def __len__(self):
@@ -225,7 +275,11 @@ class PTFAstroSL:
 
 if __name__ == '__main__':
     PTFTest = PTFAstroSL('PTFData')
+    PTFTest.split_length=365
 
 
+    for spect in PTFTest.xget_orderd_spect(dim=500, stop=2):
+        plt.imshow(spect[0])
+        plt.show()
 
 
