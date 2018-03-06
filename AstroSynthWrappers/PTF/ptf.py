@@ -100,7 +100,7 @@ class PTFAstroSL:
     def normalize(self, arr):
         return [(y/np.mean(arr))-1 for y in arr]
     
-    def get_ft(self, n=0, s=500, lock=False, nymult=1, num=1, frange=None):
+    def get_ft(self, n=0, s=500, lock=False, nymult=1, num=1, frange=[None]):
         if not self.dbft:
             return self.__generate_ft__(n=n, s=s, lock=lock, nymult=nymult, num=num, frange=frange)
         else:
@@ -173,7 +173,7 @@ class PTFAstroSL:
                 break
             yield self.get_lc(n=target['numerical_index'])
 
-    def xget_orderd_ft(self, stop=None, s=500, lock=False, nymult=1, num=1):
+    def xget_orderd_ft(self, stop=None, s=500, lock=False, nymult=1, num=1, frange=[None]):
         if self.ordered_cursor is None:
             self.ordered_cursor = self.__get_ordered_cursor__()
         self.ordered_cursor, cur = tee(self.ordered_cursor)
@@ -182,7 +182,7 @@ class PTFAstroSL:
         for i, target in enumerate(cur):
             if i >= stop:
                 break
-            yield self.get_ft(n=target['numerical_index'], s=s, lock=lock, num=num)
+            yield self.get_ft(n=target['numerical_index'], s=s, lock=lock, num=num, frange=frange)
 
     def xget_lc(self, stop=None, start=0):
         if stop is None:
@@ -190,11 +190,11 @@ class PTFAstroSL:
         for i in range(start, stop):
             yield self.get_lc(n=i)
 
-    def xget_ft(self, stop=None, start=0, s=500, lock=False, nymult=1, num=1):
+    def xget_ft(self, stop=None, start=0, s=500, lock=False, nymult=1, num=1, frange=[None]):
         if stop is None:
             stop = self.size
         for i in range(start, stop):
-            yield self.get_ft(n=i, s=s, lock=lock, num=num)
+            yield self.get_ft(n=i, s=s, lock=lock, num=num, frange=frange)
 
     def get_psedo_visit_num(self, n=0):
         data = self.__get_target_buffer__(n)
@@ -231,7 +231,6 @@ class PTFAstroSL:
             UD_stretch = 1/UD_stretch
         for Freq, Amp, meta in self.xget_sub_ft(n=n, s=500, lock=True, nymult=100):
             Amps.append(Amp[0])
-        print(len(Amps))
         out_tuple = (np.repeat(np.repeat(Amps, LD_stretch, axis=1), UD_stretch, axis=0),
                      Freq, meta)
         orig_max = out_tuple[0].max()
@@ -245,8 +244,14 @@ class PTFAstroSL:
         out_tuple = (out_img, out_tuple[1], out_tuple[2])
         return out_tuple
 
+    def xget_spect(self, start=0, stop=None, dim=50, Normalize=False, s=500, nymult=1):
+        if stop is None:
+            stop = self.size
+        for i in range(start, stop):
+            yield self.__get_spect__(n=i, s=s, dim=dim, Normalize=Normalize, nymult=nymult)
+
     def xget_orderd_spect(self, s=500, dim=50,
-                             Normalize=False, stop=None):
+                          Normalize=False, stop=None,nymult=1):
         if self.ordered_cursor is None:
             self.ordered_cursor = self.__get_ordered_cursor__()
         self.ordered_cursor, cur = tee(self.ordered_cursor)
@@ -256,7 +261,7 @@ class PTFAstroSL:
             if i >= stop:
                 break
             n = target["numerical_index"]
-            yield self.__get_spect__(n=n, s=s, dim=dim, Normalize=Normalize)
+            yield self.__get_spect__(n=n, s=s, dim=dim, Normalize=Normalize, nymult=nymult)
 
 
     def __len__(self):
