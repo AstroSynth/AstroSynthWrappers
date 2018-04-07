@@ -14,6 +14,8 @@ from bson.objectid import ObjectId
 
 import matplotlib.pyplot as plt
 
+from .utils import sto_sample_PTF
+
 class PTFAstroSL:
     def __init__(self, collection, dbname='AstronomyData', name="PTFData", nk=100):
         with open('MongoDB.log', 'w') as f:
@@ -217,8 +219,8 @@ class PTFAstroSL:
             yield self.get_object(n=i)
 
     def cache_ft(self, s=500, lock=False, nymult=1, num=1):
-        for freq, amp, meta in self.xget_ft(s=s, lock=lock, nymult=nymult, num=num):
-            ID = meta[0]
+        for freq, amp, (ID, n) in self.xget_ft(s=s, lock=lock, nymult=nymult, num=num):
+            ID = ID
             post = {"Frequency":freq.tolist(), "Amplitude":amp.tolist()}
             self.collection.update({"_id":ID}, {"$set":post}, upsert=False)
 
@@ -263,6 +265,9 @@ class PTFAstroSL:
             n = target["numerical_index"]
             yield self.__get_spect__(n=n, s=s, dim=dim, Normalize=Normalize, nymult=nymult)
 
+
+    def resample(self, pfrac=0.5, start=0, stop=None):
+        sto_sample_PTF(self, self.collection, pfrac, start=start, stop=stop)
 
     def __len__(self):
         return self.size
