@@ -12,7 +12,6 @@ from itertools import tee
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
-import matplotlib.pyplot as plt
 
 from .utils import sto_sample_PTF
 
@@ -33,6 +32,7 @@ class PTFAstroSL:
         self.__fill_data_buffer__(0)
         self.dbft = False
         self.split_length = 365 # days
+        self.belement = 'mag'
 
     def use_db_ft(self, use):
         if 'Frequency' in self.collection.find_one() and use:
@@ -207,7 +207,7 @@ class PTFAstroSL:
         if not full:
             data = self.__split__(data)
             data = data[se]
-        return data.obsHJD.tolist(), data.mag.tolist(), (data._id.tolist()[0], data.numerical_index.tolist()[0])
+        return data.obsHJD.tolist(), data[self.belement].tolist(), (data._id.tolist()[0], data.numerical_index.tolist()[0])
 
     def get_object(self, n=0):
         return self.__get_target_buffer__(n)
@@ -269,6 +269,9 @@ class PTFAstroSL:
     def resample(self, pfrac=0.5, start=0, stop=None):
         sto_sample_PTF(self, self.collection, pfrac, start=start, stop=stop)
 
+    def switch_to_resampled(self):
+        self.belement = 'cSample'
+
     def __len__(self):
         return self.size
 
@@ -291,12 +294,4 @@ class PTFAstroSL:
         print('Shutting Down Mongo Server')
         self.mongodb.terminate()
 
-
-if __name__ == '__main__':
-    PTFTest = PTFAstroSL('PTFData')
-    PTFTest.split_length=365
-
-    ft = PTFTest.get_ft(n=0, lock=True, frange=[144, 2880])
-    plt.plot(ft[0][0], ft[1][0])
-    plt.show()
 
