@@ -28,7 +28,7 @@ def mk_ephem_params(l, amp_range=[0, 0.02], freq_range=[0.0008333, 0.01667], pha
     return funcs
 
 
-def time_sample_PTF(n, data, pulsator, mag, l=3, noise_range=[0.02, 0.2]):
+def time_sample_PTF(n, data, pulsator, mag, l=3, noise_range=[0.02, 0.2], noise=True):
     if pulsator:
         ephem_params = mk_ephem_params(l)
     else:
@@ -36,14 +36,17 @@ def time_sample_PTF(n, data, pulsator, mag, l=3, noise_range=[0.02, 0.2]):
     t = np.array(data[n][0])
     noise_scatter = np.random.uniform(noise_range[0], noise_range[1])
     pure_ephem = ephem_sum(t, ephem_params)
-    ephem = pure_ephem + np.random.normal(mag, noise_scatter, size=(len(t),))
+    if noise:
+        ephem = pure_ephem + np.random.normal(mag, noise_scatter, size=(len(t),))
+    else:
+        ephem = pure_ephem
     return t, ephem
 
 
-def sto_sample_PTF(df, collection, pfrac, start=0, stop=None):
+def sto_sample_PTF(df, collection, pfrac, start=0, stop=None, noise=True):
     for freq, amp, (ID, n) in tqdm(df.xget_lc(start=start, stop=stop), total=stop-start):
         pulsator = bool(np.random.choice([0, 1], 1, p=[1-pfrac, pfrac])[0])
-        t, csample = time_sample_PTF(n, df, pulsator, np.mean(collection.find_one({"_id":ID}, {"mag":1, "_id":0})['mag']))
+        t, csample = time_sample_PTF(n, df, pulsator, np.mean(collection.find_one({"_id":ID}, {"mag":1, "_id":0})['mag']), noise=noise)
         post = {"cSample":list(csample), "cSampleClass":pulsator}
         collection.update({"_id":ID}, {"$set":post}, upsert=False)
 

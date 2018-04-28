@@ -266,8 +266,8 @@ class PTFAstroSL:
             yield self.__get_spect__(n=n, s=s, dim=dim, Normalize=Normalize, nymult=nymult)
 
 
-    def resample(self, pfrac=0.5, start=0, stop=None):
-        sto_sample_PTF(self, self.collection, pfrac, start=start, stop=stop)
+    def resample(self, pfrac=0.5, start=0, stop=None, noise=True):
+        sto_sample_PTF(self, self.collection, pfrac, start=start, stop=stop, noise=noise)
 
     def switch_to_resampled(self):
         self.belement = 'cSample'
